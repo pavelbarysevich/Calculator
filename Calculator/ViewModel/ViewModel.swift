@@ -1,98 +1,198 @@
 import SwiftUI
+import Observation
 
+// ViewModel калькулятора: бизнес-логика, состояние, история
 @Observable
-class ViewModel {
-    
-    var value: String = "0"
-    var number: Double = 0.0
-    var currentOperation: Operations = .none
-   
-    //Mark: Array Buttons
-    let arrayButtons: [[Buttons]] = [
-        [.clean, .changeOfSign, .percent, .divide],
+final class CalculatorViewModel {
+    // Текущее выражение, отображаемое на экране (например, "2+2")
+    var expression: String = ""
+    // Результат вычисления (nil, если не нажато "=")
+    var result: String? = nil
+    // История вычислений (массив строк вида "2+2 = 4")
+    var history: [String] = []
+    // Кнопки калькулятора, разбитые по строкам для отображения
+    let buttons: [[CalculatorButton]] = [
+        [.ac, .sign, .percent, .divide],
         [.seven, .eight, .nine, .multiply],
         [.four, .five, .six, .minus],
         [.one, .two, .three, .plus],
         [.zero, .dot, .equal]
     ]
     
-    func tapBattons(item: Buttons) {
-        switch item {
-        case .plus, .minus, .multiply, .divide:
-            currentOperation = item.buttonsToOparetions()
-            number = Double(value) ?? 0
-            value = "0"
-        case .clean:
-            value = "0"
-        case .changeOfSign:
-            if let currentValue = Double(value) {
-                value = formatResult(-currentValue)
+    // Основная функция обработки нажатия кнопки калькулятора
+    func handleTap(_ button: CalculatorButton) {
+        // Если на экране ошибка — разрешаем только очистку
+        if let res = result, res == "На 0 делить нельзя" || res == "Ошибка" {
+            if button == .ac { clear() }
+            return
+        }
+        switch button {
+        case .ac:
+            clear() // Полная очистка
+        case .backspace:
+            removeLastSymbol() // Удалить последний символ
+        case .equal:
+            calculate() // Вычислить результат
+        default:
+            append(button) // Добавить символ к выражению
+        }
+    }
+    
+    // Добавляет символ к выражению или начинает новое выражение после результата
+    private func append(_ button: CalculatorButton) {
+        // Если только что был показан результат — начинаем новое выражение или продолжаем с результатом
+        if let res = result {
+            switch button {
+            case .plus, .minus, .multiply, .divide:
+                expression = res + button.rawValue
+                result = nil
+                return
+            case .zero, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .dot:
+                expression = ""
+                result = nil
+            default:
+                return
             }
-        case .percent:
-            if let currentValue = Double(value) {
-                value = formatResult((currentValue / 100) * number)
+        }
+        // Логика предотвращения некорректного ввода (несколько нулей, точек и т.д.)
+        let lastNumber = lastNumberInExpression(expression)
+        switch button {
+        case .zero:
+            if expression.isEmpty { expression = "0"; return }
+            if lastNumber == "0" { return }
+            if lastNumber.hasPrefix("0") && !lastNumber.contains(".") && lastNumber.count == 1 { return }
+            expression += "0"
+        case .one, .two, .three, .four, .five, .six, .seven, .eight, .nine:
+            if lastNumber == "0" && !lastNumber.contains(".") {
+                expression = String(expression.dropLast()) + button.rawValue
+            } else {
+                expression += button.rawValue
             }
         case .dot:
-            if !value.contains(".") {
-                value += "."
+            if expression.isEmpty || isLastCharOperation(expression) {
+                expression += "0."
+                return
             }
-        case .equal:
-            if let currentValue = Double(value) {
-                value = formatResult(performButtons(currentValue))
-            }
-        default:
-            if value == "0" {
-                value = item.rawValue
+            if lastNumber.contains(".") { return }
+            expression += "."
+        case .plus, .minus, .multiply, .divide:
+            if expression.isEmpty { return }
+            if isLastCharOperation(expression) { return }
+            expression += button.rawValue
+        case .sign:
+            // Смена знака у последнего числа
+            guard !expression.isEmpty else { return }
+            var chars = Array(expression)
+            let end = chars.count - 1
+            var start = end
+            while start >= 0 && (chars[start].isNumber || chars[start] == ".") { start -= 1 }
+            start += 1
+            if start > 0 && chars[start - 1] == "-" && (start == 1 || ["+", "-", "×", "÷"].contains(String(chars[start - 2]))) {
+                chars.remove(at: start - 1)
             } else {
-                value += item.rawValue
+                chars.insert("-", at: start)
             }
-                
-        }
-    }
-    
-    //MARK: Remove last zero Method
-    func formatResult(_ result: Double) -> String {
-        return String(format: "%g", result)
-    }
-    
-    //MARK: calculator method
-    func performButtons(_ currentValue: Double) -> Double {
-        switch currentOperation {
-        case .addition:
-            return number + currentValue
-        case .subtraction:
-            return number - currentValue
-        case .multiplication:
-            return number * currentValue
-        case .distribution:
-            return number / currentValue
+            expression = String(chars)
         default:
-            return currentValue
+            break
         }
     }
     
-    
-    //MARK: Func Buttons size Width and Height
-    func buttonWidth(item: Buttons) -> CGFloat {
-        let spasing: CGFloat = 12
-        let rowItemSpasing: CGFloat = 5 * spasing
-        let rowItemSpasingZero: CGFloat = 4 * spasing
-        let row: CGFloat = 4
-        let sizeScreen: CGFloat = UIScreen.main.bounds.width
-        
-        if item == .zero {
-            return (sizeScreen - rowItemSpasingZero) / row * 2
+    // Вычисляет результат выражения и сохраняет его в result и history
+    private func calculate() {
+        guard !expression.isEmpty else { return }
+        // Проверка на некорректное выражение (заканчивается на операцию)
+        if let last = expression.last, ["+", "-", "×", "÷", "%"].contains(String(last)) {
+            result = "Ошибка"
+            return
         }
-        
-        return (sizeScreen - rowItemSpasing) / row
+        // Проверка на деление на 0
+        if expression.hasSuffix("÷0") || expression.hasSuffix("÷0.") {
+            result = "На 0 делить нельзя"
+            return
+        }
+        // Преобразование выражения для NSExpression
+        let exp = expression.replacingOccurrences(of: "×", with: "*").replacingOccurrences(of: "÷", with: "/")
+        let expr = NSExpression(format: exp)
+        if let value = expr.expressionValue(with: nil, context: nil) as? NSNumber {
+            let doubleValue = value.doubleValue
+            if doubleValue.isInfinite || doubleValue.isNaN {
+                result = "На 0 делить нельзя"
+            } else {
+                result = formatResult(doubleValue)
+                saveCurrentToHistory()
+            }
+        } else {
+            result = "Ошибка"
+        }
     }
     
-    func  buttonHeight() -> CGFloat {
-        let spasing: CGFloat = 12
-        let rowItemSpasing: CGFloat = 5 * spasing
+    // Сохраняет текущее выражение и результат в историю
+    func saveCurrentToHistory() {
+        guard let res = result, !expression.isEmpty else { return }
+        let entry = "\(expression) = \(res)"
+        history.append(entry)
+    }
+    
+    // Удаляет последний символ из выражения или полностью очищает, если символ один
+    func removeLastSymbol() {
+        if !expression.isEmpty {
+            expression.removeLast()
+            if expression.isEmpty {
+                clear()
+            }
+        } else {
+            clear()
+        }
+    }
+    
+    // Полная очистка выражения и результата
+    private func clear() {
+        expression = ""
+        result = nil
+    }
+    
+    // Форматирует результат для отображения (убирает лишние нули, не использует экспоненциальную запись)
+    private func formatResult(_ result: Double) -> String {
+        if result.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f", result)
+        } else {
+            return String(format: "%.6f", result)
+                .replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\.$", with: "", options: .regularExpression)
+        }
+    }
+    
+    // Вспомогательная функция: получить последнее число из выражения
+    private func lastNumberInExpression(_ expression: String) -> String {
+        var number = ""
+        for char in expression.reversed() {
+            if char.isNumber || char == "." { number = String(char) + number } else { break }
+        }
+        return number
+    }
+    // Вспомогательная функция: проверить, является ли последний символ операцией
+    private func isLastCharOperation(_ expression: String) -> Bool {
+        guard let last = expression.last else { return false }
+        return ["+", "-", "×", "÷"].contains(String(last))
+    }
+    // Размеры кнопок для адаптивного интерфейса
+    func buttonWidth(_ button: CalculatorButton) -> CGFloat {
+        let spacing: CGFloat = 12
+        let rowSpacing: CGFloat = 5 * spacing
+        let zeroSpacing: CGFloat = 4 * spacing
         let row: CGFloat = 4
-        let sizeScreen: CGFloat = UIScreen.main.bounds.width
-        
-        return (sizeScreen - rowItemSpasing) / row
+        let screen: CGFloat = UIScreen.main.bounds.width
+        if button == .zero {
+            return (screen - zeroSpacing) / row * 2
+        }
+        return (screen - rowSpacing) / row
+    }
+    func buttonHeight() -> CGFloat {
+        let spacing: CGFloat = 12
+        let rowSpacing: CGFloat = 5 * spacing
+        let row: CGFloat = 4
+        let screen: CGFloat = UIScreen.main.bounds.width
+        return (screen - rowSpacing) / row
     }
 }

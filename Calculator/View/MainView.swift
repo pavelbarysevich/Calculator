@@ -1,160 +1,143 @@
 import SwiftUI
 
 struct MainView: View {
-    
-    @State var viewModel = ViewModel()
+    // ViewModel калькулятора, получаем из environment
+    @Environment(CalculatorViewModel.self) private var model
+    // Состояние для отображения sheet с историей
+    @State private var showHistory = false
     
     var body: some View {
-        
-        //MARK: background
-        ZStack{
-            Color.black
-                .ignoresSafeArea()
-            VStack (spacing: 12) {
+        // Текст, который отображается на экране (результат или выражение)
+        let displayText = model.result ?? (model.expression.isEmpty ? "0" : model.expression)
+        ZStack(alignment: .topTrailing) {
+            // Фон приложения — чёрный
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 12) {
                 Spacer()
-                
-                //Mark: current view buttons
-                HStack() {
+                // Блок отображения результата или выражения
+                HStack {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 0) {
-                        Text(viewModel.value)
-                            .foregroundColor(.white)
-                            .font(.system(size: 100, weight: .light))
-                            .padding(.horizontal, 28)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        // ZStack для анимации смены текста
+                        ZStack {
+                            // Если ошибка — показываем ошибку красным
+                            if let result = model.result, result == "Ошибка" || result == "На 0 делить нельзя" {
+                                Text(String(result.prefix(30)))
+                                    .id(result)
+                                    .foregroundColor(.red)
+                                    .font(.system(size: 90, weight: .light))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.2)
+                                    .padding(.horizontal, 28)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                    .transition(.opacity)
+                            } else {
+                                // Иначе — выражение или результат белым
+                                Text(String(displayText.prefix(30)))
+                                    .id(displayText)
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 90, weight: .light))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.2)
+                                    .padding(.horizontal, 28)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                    .transition(.opacity)
+                            }
+                        }
+                        // Анимация смены текста
+                        .animation(.linear(duration: 0.02), value: model.result ?? displayText)
                     }
                 }
-                
-                ForEach(viewModel.arrayButtons, id: \.self) { row in
+                // Первая строка кнопок: динамически AC или ⌫
+                HStack(spacing: 12) {
+                    // Если результат есть или символов <= 1 — AC, иначе ⌫
+                    let firstButton: CalculatorButton = (model.result != nil || model.expression.count <= 1) ? .ac : .backspace
+                    ForEach([firstButton] + Array(model.buttons[0].dropFirst()), id: \.self) { button in
+                        Button {
+                            model.handleTap(button)
+                        } label: {
+                            Text(button.rawValue)
+                                .font(.system(size: 35))
+                                .frame(
+                                    width: model.buttonWidth(button),
+                                    height: model.buttonHeight()
+                                )
+                                .background(button.color)
+                                .foregroundColor(.white)
+                                .cornerRadius(.infinity)
+                        }
+                    }
+                }
+                // Остальные строки кнопок калькулятора
+                ForEach(Array(model.buttons.dropFirst()).enumerated(), id: \.offset) { _, row in
                     HStack(spacing: 12) {
-                        ForEach(row, id: \.self) { item in
+                        ForEach(row, id: \.self) { button in
                             Button {
-                                viewModel.tapBattons(item: item)
+                                model.handleTap(button)
                             } label: {
-                                Text(item.rawValue)
+                                Text(button.rawValue)
                                     .font(.system(size: 35))
                                     .frame(
-                                        width: viewModel.buttonWidth(item: item),
-                                        height: viewModel.buttonHeight()
+                                        width: model.buttonWidth(button),
+                                        height: model.buttonHeight()
                                     )
-                                    .background(item.colorButtons)
+                                    .background(button.color)
                                     .foregroundColor(.white)
                                     .cornerRadius(.infinity)
                             }
-
                         }
                     }
                 }
             }
             .padding(.bottom)
-            
-        }
-    }
-}
-
-extension MainView {
-    class ViewModel {
-        var value: String = "0"
-        var number: Double = 0
-        var currentOperation: Buttons?
-        
-        let arrayButtons: [[Buttons]] = [
-            [.clean, .divide, .multiply, .minus],
-            [.seven, .eight, .nine, .plus],
-            [.four, .five, .six, .equal],
-            [.one, .two, .three, .equal],
-            [.zero]
-        ]
-        
-        func tapBattons(item: Buttons) {
-            switch item {
-            case .clean:
-                value = "0"
-                number = 0
-                currentOperation = nil
-            case .plus, .minus, .multiply, .divide:
-                if let newValue = Double(value) {
-                    number = newValue
-                    value = "0"
-                    currentOperation = item
+            // Кнопка открытия истории (книга) в правом верхнем углу
+            HStack {
+                Button {
+                    showHistory = true
+                } label: {
+                    Image(systemName: "book")
+                        .font(.system(size: 28, weight: .regular))
+                        .foregroundColor(.white)
+                        .padding(16)
                 }
-            case .equal:
-                if let newValue = Double(value), let operation = currentOperation {
-                    performOperation(operation, with: newValue)
-                    currentOperation = nil
+                Spacer()
+            }
+        }
+        // Окно истории вычислений
+        .sheet(isPresented: $showHistory) {
+            NavigationView {
+                // Список истории, каждая запись — отдельная выделенная ячейка
+                List(model.history.reversed(), id: \.self) { entry in
+                    HStack {
+                        Text(entry)
+                            .font(.system(size: 22, weight: .regular))
+                            .foregroundColor(.white)
+                            .padding()
+                        Spacer()
+                    }
+                    .background(Color.gray.opacity(0.25))
+                    .cornerRadius(12)
+                    .padding(.vertical, 2)
+                    .listRowBackground(Color.black)
                 }
-            default:
-                if value == "0" {
-                    value = item.rawValue
-                } else {
-                    value += item.rawValue
+                .navigationTitle("История")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(Color.black, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть") { showHistory = false }
+                            .foregroundColor(.white)
+                    }
                 }
+                .scrollContentBackground(.hidden)
+                .background(Color.black)
             }
-        }
-        
-        private func performOperation(_ operation: Buttons, with newValue: Double) {
-            switch operation {
-            case .plus:
-                number += newValue
-            case .minus:
-                number -= newValue
-            case .multiply:
-                number *= newValue
-            case .divide:
-                if newValue != 0 {
-                    number /= newValue
-                } else {
-                    // handle divide by zero if needed
-                    number = 0
-                }
-            default:
-                break
-            }
-            value = formatResult(number)
-        }
-        
-        private func formatResult(_ number: Double) -> String {
-            if number.truncatingRemainder(dividingBy: 1) == 0 {
-                return String(format: "%.0f", number)
-            } else {
-                return String(number)
-            }
-        }
-        
-        func buttonWidth(item: Buttons) -> CGFloat {
-            if item == .zero {
-                return 170
-            }
-            return 80
-        }
-        
-        func buttonHeight() -> CGFloat {
-            80
-        }
-    }
-    
-    enum Buttons: String, Hashable {
-        case zero = "0", one = "1", two = "2", three = "3", four = "4", five = "5", six = "6", seven = "7", eight = "8", nine = "9"
-        case plus = "+"
-        case minus = "-"
-        case multiply = "×"
-        case divide = "÷"
-        case equal = "="
-        case clean = "C"
-        
-        var colorButtons: Color {
-            switch self {
-            case .plus, .minus, .multiply, .divide, .equal:
-                return .orange
-            case .clean:
-                return .gray
-            default:
-                return Color(.darkGray)
-            }
+            .background(Color.black)
+            .presentationDetents([.fraction(0.6), .fraction(1.0)])
         }
     }
 }
 
 #Preview {
-    MainView()
+    MainView().environment(CalculatorViewModel())
 }

@@ -18,11 +18,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		E6283B472E11D5D4003F178F /* Exstension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Exstension;
-			sourceTree = "<group>";
-		};
 		E68162B52E098EB3004EE466 /* Model */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Model;
@@ -73,7 +68,6 @@
 				E68162BA2E098F21004EE466 /* View */,
 				E68162B82E098EDE004EE466 /* ViewModel */,
 				E68162B52E098EB3004EE466 /* Model */,
-				E6283B472E11D5D4003F178F /* Exstension */,
 				E68162AF2E098EA8004EE466 /* CalculatorApp.swift */,
 				E68162AE2E098EA8004EE466 /* Assets.xcassets */,
 			);
@@ -96,7 +90,6 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				E6283B472E11D5D4003F178F /* Exstension */,
 				E68162B52E098EB3004EE466 /* Model */,
 				E68162B82E098EDE004EE466 /* ViewModel */,
 				E68162BA2E098F21004EE466 /* View */,
