@@ -177,22 +177,24 @@ final class CalculatorViewModel {
         return ["+", "-", "×", "÷"].contains(String(last))
     }
     // Размеры кнопок для адаптивного интерфейса
-    func buttonWidth(_ button: CalculatorButton) -> CGFloat {
+    // Использует переданную ширину экрана вместо UIScreen.main.bounds.width для гибкости
+    func buttonWidth(_ button: CalculatorButton, screenWidth: CGFloat) -> CGFloat {
         let spacing: CGFloat = 12
         let rowSpacing: CGFloat = 5 * spacing
         let zeroSpacing: CGFloat = 4 * spacing
         let row: CGFloat = 4
-        let screen: CGFloat = UIScreen.main.bounds.width
+        let screen: CGFloat = screenWidth // Переменная screen типа CGFloat получает значение ширины экрана, переданное через параметр screenWidth.
         if button == .zero {
             return (screen - zeroSpacing) / row * 2
         }
         return (screen - rowSpacing) / row
     }
-    func buttonHeight() -> CGFloat {
+    // Использует переданную ширину экрана вместо UIScreen.main.bounds.width для гибкости
+    func buttonHeight(screenWidth: CGFloat) -> CGFloat {
         let spacing: CGFloat = 12
         let rowSpacing: CGFloat = 5 * spacing
         let row: CGFloat = 4
-        let screen: CGFloat = UIScreen.main.bounds.width
+        let screen: CGFloat = screenWidth // Переменная screen типа CGFloat получает значение ширины экрана, переданное через параметр screenWidth.
         return (screen - rowSpacing) / row
     }
 }

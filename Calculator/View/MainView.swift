@@ -12,74 +12,56 @@ struct MainView: View {
         ZStack(alignment: .topTrailing) {
             // Фон приложения — чёрный
             Color.black.ignoresSafeArea()
-            VStack(spacing: 12) {
-                Spacer()
-                // Блок отображения результата или выражения
-                HStack {
+            GeometryReader { geometry in
+                VStack(spacing: 12) {
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 0) {
-                        // ZStack для анимации смены текста
-                        ZStack {
-                            // Если ошибка — показываем ошибку красным
-                            if let result = model.result, result == "Ошибка" || result == "На 0 делить нельзя" {
-                                Text(String(result.prefix(30)))
-                                    .id(result)
-                                    .foregroundColor(.red)
-                                    .font(.system(size: 90, weight: .light))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.2)
-                                    .padding(.horizontal, 28)
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                    .transition(.opacity)
-                            } else {
-                                // Иначе — выражение или результат белым
-                                Text(String(displayText.prefix(30)))
-                                    .id(displayText)
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 90, weight: .light))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.2)
-                                    .padding(.horizontal, 28)
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                    .transition(.opacity)
+                    // Блок отображения результата или выражения
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 0) {
+                            // ZStack для анимации смены текста
+                            ZStack {
+                                // Если ошибка — показываем ошибку красным
+                                if let result = model.result, result == "Ошибка" || result == "На 0 делить нельзя" {
+                                    Text(String(result.prefix(30)))
+                                        .id(result)
+                                        .foregroundColor(.red)
+                                        .font(.system(size: 90, weight: .light))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.2)
+                                        .padding(.horizontal, 28)
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                        .transition(.opacity)
+                                } else {
+                                    // Иначе — выражение или результат белым
+                                    Text(String(displayText.prefix(30)))
+                                        .id(displayText)
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 90, weight: .light))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.2)
+                                        .padding(.horizontal, 28)
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                        .transition(.opacity)
+                                }
                             }
-                        }
-                        // Анимация смены текста
-                        .animation(.linear(duration: 0.02), value: model.result ?? displayText)
-                    }
-                }
-                // Первая строка кнопок: динамически AC или ⌫
-                HStack(spacing: 12) {
-                    // Если результат есть или символов <= 1 — AC, иначе ⌫
-                    let firstButton: CalculatorButton = (model.result != nil || model.expression.count <= 1) ? .ac : .backspace
-                    ForEach([firstButton] + Array(model.buttons[0].dropFirst()), id: \.self) { button in
-                        Button {
-                            model.handleTap(button)
-                        } label: {
-                            Text(button.rawValue)
-                                .font(.system(size: 35))
-                                .frame(
-                                    width: model.buttonWidth(button),
-                                    height: model.buttonHeight()
-                                )
-                                .background(button.color)
-                                .foregroundColor(.white)
-                                .cornerRadius(.infinity)
+                            // Анимация смены текста
+                            .animation(.linear(duration: 0.02), value: model.result ?? displayText)
                         }
                     }
-                }
-                // Остальные строки кнопок калькулятора
-                ForEach(Array(model.buttons.dropFirst()).enumerated(), id: \.offset) { _, row in
+                    // Первая строка кнопок: динамически AC или ⌫
                     HStack(spacing: 12) {
-                        ForEach(row, id: \.self) { button in
+                        // Если результат есть или символов <= 1 — AC, иначе ⌫
+                        let firstButton: CalculatorButton = (model.result != nil || model.expression.count <= 1) ? .ac : .backspace
+                        ForEach([firstButton] + Array(model.buttons[0].dropFirst()), id: \.self) { button in
                             Button {
                                 model.handleTap(button)
                             } label: {
                                 Text(button.rawValue)
                                     .font(.system(size: 35))
                                     .frame(
-                                        width: model.buttonWidth(button),
-                                        height: model.buttonHeight()
+                                        width: model.buttonWidth(button, screenWidth: geometry.size.width),
+                                        height: model.buttonHeight(screenWidth: geometry.size.width)
                                     )
                                     .background(button.color)
                                     .foregroundColor(.white)
@@ -87,9 +69,29 @@ struct MainView: View {
                             }
                         }
                     }
+                    // Остальные строки кнопок калькулятора
+                    ForEach(Array(model.buttons.dropFirst()).enumerated(), id: \.offset) { _, row in
+                        HStack(spacing: 12) {
+                            ForEach(row, id: \.self) { button in
+                                Button {
+                                    model.handleTap(button)
+                                } label: {
+                                    Text(button.rawValue)
+                                        .font(.system(size: 35))
+                                        .frame(
+                                            width: model.buttonWidth(button, screenWidth: geometry.size.width),
+                                            height: model.buttonHeight(screenWidth: geometry.size.width)
+                                        )
+                                        .background(button.color)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(.infinity)
+                                }
+                            }
+                        }
+                    }
                 }
+                .padding(.bottom)
             }
-            .padding(.bottom)
             // Кнопка открытия истории (книга) в правом верхнем углу
             HStack {
                 Button {
